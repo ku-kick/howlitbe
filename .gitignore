@@ -1,0 +1,9 @@
+__pycache__/
+*__pycache__/
+venv/
+.commitmsg
+.eggs/
+build/
+imposter.egg-info/
+nothing
+name.egg-info/
