@@ -1,0 +1,2 @@
+# Requirements for running examples. Not part of the primary library
+networkx==3.4.1

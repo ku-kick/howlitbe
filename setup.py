@@ -21,7 +21,9 @@ with open("README.md", 'r', encoding='utf-8') as f:
 setup(
     name=project_name,
     packages=[
-        project_name
+        "howlitbe",
+        "howlitbe.processing",
+        "howlitbe.routing"
     ],
     package_data={},
     include_package_data=True,
@@ -45,4 +47,3 @@ setup(
         {project_name} = {project_name}.app:main
     """
 )
-
