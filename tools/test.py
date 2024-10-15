@@ -2,7 +2,10 @@ import pkgutil
 import importlib
 import howlitbe
 
+
 def check_function_in_module(module_name, function_name):
+    checked = set()
+
     try:
         # Import the specified module
         module = importlib.import_module(module_name)
@@ -12,10 +15,13 @@ def check_function_in_module(module_name, function_name):
 
     # Function to traverse packages and check for the function
     def traverse_packages(package):
+        nonlocal checked
         for importer, modname, ispkg in pkgutil.walk_packages(package.__path__, package.__name__ + "."):
-            print(package)
-            print(modname)
-            print(ispkg)
+            # Prevent double checking
+            if modname in checked:
+                continue
+            checked = checked.union({modname})
+
             if ispkg:
                 # Recursive call for sub-packages
                 sub_package = importlib.import_module(modname)
@@ -28,11 +34,9 @@ def check_function_in_module(module_name, function_name):
                         print("Testing", f'"{modname}.{attribute}"')
                         getattr(mod, attribute)()
 
-                # if hasattr(mod, function_name):
-                #     print(f"Function '{function_name}' found in module: {modname}")
-
     # Start traversing from the main module
     traverse_packages(module)
 
 # Example usage
 check_function_in_module('howlitbe', 'test')
+print("SUCCESS! No test has triggered an assert")
