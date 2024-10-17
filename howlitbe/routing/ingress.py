@@ -7,7 +7,8 @@ import howlitbe.topology
 class Base:
     "Base ingress interface"
 
-    def __init__(topology: howlitbe.topology.Topology):
+    def __init__(topology):
+        # TODO: revision required.
         self._topology = topology  # Represents network topology
 
     def get_request_processor(self, request: bytes) -> howlitbe.topology.Node:
