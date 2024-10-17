@@ -1,1 +1,2 @@
 tired @ git+https://github.com/damurashov/TIRED.git@master
+networkx==3.1

@@ -1,6 +1,7 @@
 import pkgutil
 import importlib
 import howlitbe
+import tired.logging
 
 
 def check_function_in_module(module_name, function_name):
@@ -38,5 +39,6 @@ def check_function_in_module(module_name, function_name):
     traverse_packages(module)
 
 # Example usage
+tired.logging.set_level(tired.logging.DEBUG)
 check_function_in_module('howlitbe', 'test')
 print("SUCCESS! No test has triggered an assert")
