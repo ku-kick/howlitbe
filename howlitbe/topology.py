@@ -146,6 +146,12 @@ class Topology(nx.Graph):
         return self.graph
 
     def render(self):
+        """
+        Render matplotlib plot w/ coloration:
+        - orange - switches
+        - green - gate switches
+        - blue - nodes
+        """
         def __node_color(node_data):
             if type(node_data) is Switch:
                 color = "orange"
@@ -263,7 +269,13 @@ class Topology(nx.Graph):
                     tired.logging.error("Unexpected premature stack exhaustion")
                     raise ValueError
 
-        # Connect nodes
+        # Connect nodes to switches
+        n_nodes_per_switch = int(math.ceil(n_nodes / n_switches_total))
+        for n in range(n_nodes):
+            g.add_node(hash(nodes[n]), data=nodes[n])
+            s = int(n / n_nodes_per_switch)
+            link=PhysicalLink(node1=nodes[n], node2=switches[s], bandwidth=10)  # TODO: check the bw, it's wrong
+            g.add_edge(hash(nodes[n]), hash(switches[s]), relationship=link)
 
         # Build the object
         ret = Topology(g)
