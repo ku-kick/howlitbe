@@ -10,7 +10,8 @@ long_description=""
 url="example.com"
 
 with open('requirements.txt', 'r') as f:
-    requirements = list(filter(lambda i: len(i) > 0, map(lambda i: i.strip(), f.readlines())))
+    # "Parse" requirements, exclude comments, and emptylines
+    requirements = list(filter(lambda i: len(i) > 0 and not i.startswith('#'), map(lambda i: i.strip(), f.readlines())))
 
 print(f"requirements: {requirements}")
 
@@ -22,8 +23,7 @@ setup(
     name=project_name,
     packages=[
         "howlitbe",
-        "howlitbe.processing",
-        "howlitbe.routing"
+        "howlitbe.scenario",
     ],
     package_data={},
     include_package_data=True,

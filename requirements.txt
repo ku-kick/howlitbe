@@ -1,2 +1,5 @@
+# The code assumes that containernet is already installed on the machine
 tired @ git+https://github.com/damurashov/TIRED.git@master
 networkx==3.1
+twoopt @ git+https://github.com/ku-kick/NetworkOptimizationModel@master
+matplotlib==3.7.5

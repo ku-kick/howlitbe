@@ -2,6 +2,10 @@ import pkgutil
 import importlib
 import howlitbe
 import tired.logging
+import os
+
+
+os.environ["HWL_TEST_LB22_TOPO"] = "1"  # To run topology generation test
 
 
 def check_function_in_module(module_name, function_name):
