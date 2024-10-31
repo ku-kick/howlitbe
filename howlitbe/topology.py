@@ -1,11 +1,12 @@
 import dataclasses
 
-import matplotlib.pyplot
-import howlitbe.misc
+import ipaddress
 import math
 import matplotlib
+import matplotlib.pyplot
 import networkx as nx
 import os
+import struct
 import tired.logging
 
 import howlitbe.topology
@@ -42,6 +43,7 @@ class _Enumeration:
         _Enumeration.__absolute_bound += 1
 
     def get_id(self):
+        """ Returns unique id within this type """
         return self.__identifier
 
     def __hash__(self):
@@ -60,6 +62,20 @@ class Node(_Enumeration):
         """
         _Enumeration.__init__(self)
         self.cpufrac = cpufrac  # Mininet (hence containernet too) allows setting CPU time fraction through utilizing linux CFS (https://www.kernel.org/doc/html/latest/scheduler/sched-design-CFS.html). See "mininet", CPULimitedHost, and "setCPUFrac()" (https://mininet.org/api/classmininet_1_1node_1_1CPULimitedHost.html)
+
+    def get_ip4(self) -> int:
+        """ Generate IP by the node's id """
+        key = "HWL_IP_NETWORK"
+        value = os.getenv(key, "10.0.0.0/24")
+        tired.logging.info(f"Environment variable {key}=\"{value}\"")
+        network = ipaddress.ip_network(value)
+        address = network.network_address
+        address = struct.unpack(">I", address.packed)[0]
+        address = address | self.get_id()
+        return address
+
+    def get_ip4_string(self) -> str:
+        return str(ipaddress.ip_address(self.get_ip4()))
 
 
 class Switch(_Enumeration):
@@ -109,6 +125,7 @@ class Container(_Enumeration):
 class OverlayContainer(Container):
     """
     Overlay container from the LB22 paper
+    TODO: The assigned id will be within the type "OverlayContainer"
     """
     def __init__(self, node: Node, cpufrac: float, networkfrac: float, hddfrac: float, name: str, overlay_id: int):
         Container.__init__(self, node, cpufrac, networkfrac, hddfrac, name)
@@ -272,10 +289,13 @@ class Topology(nx.Graph):
         # Connect nodes to switches
         n_nodes_per_switch = int(math.ceil(n_nodes / n_switches_total))
         for n in range(n_nodes):
-            g.add_node(hash(nodes[n]), data=nodes[n])
+            node1 = nodes[n]
+            g.add_node(hash(node1), data=node1)
             s = int(n / n_nodes_per_switch)
-            link=PhysicalLink(node1=nodes[n], node2=switches[s], bandwidth=10)  # TODO: check the bw, it's wrong
-            g.add_edge(hash(nodes[n]), hash(switches[s]), relationship=link)
+            switch = switches[s]
+            link=PhysicalLink(node1=nodes[n], node2=switch, bandwidth=10)  # TODO: check the bw, it's wrong
+            g.add_node(hash(switch), data=switch)
+            g.add_edge(hash(node1), hash(switch), relationship=link)
 
         # Build the object
         ret = Topology(g)
