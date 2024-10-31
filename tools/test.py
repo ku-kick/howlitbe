@@ -34,6 +34,8 @@ def check_function_in_module(module_name, function_name):
             else:
                 # Import the module and check for the function
                 mod = importlib.import_module(modname)
+                # Flush global variables
+                mod = importlib.reload(mod)
                 for attribute in dir(mod):
                     if attribute.startswith("test") and callable(getattr(mod, attribute)):
                         print("Testing", f'"{modname}.{attribute}"')
