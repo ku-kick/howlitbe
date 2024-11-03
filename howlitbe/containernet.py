@@ -22,6 +22,7 @@ def make_dry_run(classname: str):
         addSwitch = mock_function
         addController = mock_function
         start = mock_function
+        addLink = mock_function
 
     ret = _DryRun
     ret.__name__ = classname
@@ -51,6 +52,7 @@ class DeploymentBuilder:
         net = Containernet(controller=Controller)
         # Create one default controller w/ a predefined name
         net.addController('c0')
+        nodemap = dict()  # A temporary index for addressing the created mininet/containernet entities later
         # Spawn nodes and switches
         nx_graph = topology.as_nxgraph()
         for i in nx_graph.nodes():
@@ -59,13 +61,16 @@ class DeploymentBuilder:
                 switch_name = "s" + str(node.get_id())
                 # TODO: Limits
                 s = net.addSwitch(switch_name)
-                tired.logging.info(f"Built switch {switch_name}")
+                tired.logging.debug(f"Built switch {switch_name}")
+                nodemap[hash(node)] = s
             elif isinstance(node, howlitbe.topology.Node):
                 # TODO: do we really need nodes for that?
                 host_name = "h" + str(node.get_id())
                 # TODO: Limits
+                # TODO: assign IP to the host
                 tired.logging.debug("Adding host", host_name, node.get_ip4_string())
                 n = net.addHost(host_name)
+                nodemap[hash(node)] = n
             elif isinstance(node, howlitbe.topology.Container):
                 container_name = "d" + str(node.get_id())
                 # TODO: Limits
@@ -75,6 +80,15 @@ class DeploymentBuilder:
                         "application", node.name)
                 n = net.addDocker('.'.join("docker", str(node.node.get_id()), str(node.get_id()), node.name),
                         ip=node.node.get_ip4_string(), dcmd=command, dimage=f"{node.name}:latest")
+                nodemap[hash(node)] = n
+        # Add links b/w the components of the network
+        for e in nx_graph.edges():
+            edge = nx_graph.edges[e]["relationship"]
+            node1 = edge.node1
+            node2 = edge.node2
+            tired.logging.debug("Creating link between", node1.get_summary(), "and", node2.get_summary())
+            netlink = net.addLink(nodemap[hash(node1)], nodemap[hash(node2)])
+            nodemap[hash(edge)] = netlink  # JIC
 
         return net
 

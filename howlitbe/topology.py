@@ -65,6 +65,7 @@ class Node(_Enumeration):
 
     def get_ip4(self) -> int:
         """ Generate IP by the node's id """
+        # TODO: the way IP gets acquired is incorrect. The IP is defined by the switch the host connects to
         key = "HWL_IP_NETWORK"
         value = os.getenv(key, "10.0.0.0/24")
         tired.logging.info(f"Environment variable {key}=\"{value}\"")
@@ -77,6 +78,9 @@ class Node(_Enumeration):
     def get_ip4_string(self) -> str:
         return str(ipaddress.ip_address(self.get_ip4()))
 
+    def get_summary(self) -> str:
+        return f"Node, ip={self.get_ip4_string()}, id={self.get_id()}"
+
 
 class Switch(_Enumeration):
     """
@@ -88,6 +92,9 @@ class Switch(_Enumeration):
         """
         _Enumeration.__init__(self)
         self.is_gate = is_gate
+
+    def get_summary(self) -> str:
+        return f"Switch, id={self.get_id()}"
 
 
 class PhysicalLink(_Enumeration):
