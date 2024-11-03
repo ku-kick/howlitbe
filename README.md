@@ -16,3 +16,16 @@ Therefore:
 
 1. "howlitbe" IS mostly applicable to the model I mentioned. "howlitbe" MAY BE, but DOES NOT NEED TO BE extendable;
 2. "howlitbe" MAY NOT be well maintained in the second half of 2025;
+
+# WTFaQ
+
+**Running from venv**
+
+```bash
+su
+python3 -m venv ./venv --system-site-packages
+pip install .
+
+# ???
+# PROFIT!
+```

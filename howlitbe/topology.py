@@ -191,23 +191,23 @@ class Topology(nx.Graph):
             images_count: dict,
             n_overlays: int):
         """
-        Generates a random virtualized network
+        Generates a virtualized network
         - n_switches_total - total number of switches (including externally-connected ones)
         - n_nodes - number of physical nodes
         - image_count - {image name: number of images}.
 
         - Containerized applications that will be running on the nodes.
-        - Containers WILL BE randomly distributed among nodes.
+        - Containers WILL BE distributed among nodes.
         - Image names MAY repeat on a single node.
         - IF possible, each overlay WILL host at least 1 of each image type (just distribution)
-        - Images will be RANDOMLY deployed on nodes.
+        - Images will be deployed on nodes.
 
         - n_overlays: number interconnected containers, or VMs that the system hosts.
         Within overlays, applications ONLY talk to each other. (i node, i
         overlay, image_name) together form a unique identifier of a container.
         This is required for the '22 paper aprobation.
         """
-        tired.logging.info("Generating random topology with", str(n_switches_total), "switches (total),",
+        tired.logging.info("Generating a non-random topology: ", str(n_switches_total), "switches (total),",
                 str(n_gates), "gate switches,", str(n_nodes), "nodes,", "images:",
                 str(images_count), str(n_overlays), "overlays")
 

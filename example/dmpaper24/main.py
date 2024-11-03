@@ -19,7 +19,7 @@ def _parse_arguments():
 def main():
     args = _parse_arguments()
 
-    # Generate arbitrary network topology
+    # Generate network topology
     topology = howlitbe.topology.Topology.new_topology(n_switches_total=4,
             n_gates=1,
             n_nodes = 16,
@@ -29,7 +29,6 @@ def main():
                 "short-processing": 200
             },
             n_overlays=10)
-
 
     if args.scenario == "replication":
         vnt = howlitbe.scenario.lb22.VirtualizedNetworkTechnology.new_replication_scenario()
