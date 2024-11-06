@@ -46,6 +46,7 @@ except ModuleNotFoundError as e:
 
 
 class DeploymentBuilder:
+    """ Builds Containernet object from a given topology """
 
     def build_from_topology(self, topology: howlitbe.topology.Topology) -> Containernet:
         # Initialize the network

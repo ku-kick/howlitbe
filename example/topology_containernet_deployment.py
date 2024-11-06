@@ -4,6 +4,7 @@ Generates a simple topology, and deploys it on a containernet network
 
 import howlitbe.containernet
 import howlitbe.topology
+from mininet.cli import CLI
 
 
 def main():
@@ -16,7 +17,9 @@ def main():
                 "test_client:latest": 1,
             },
             n_overlays=2)
-    howlitbe.containernet.run_topology(topology=topology)
+    net = howlitbe.containernet.DeploymentBuilder().build_from_topology(topology=topology)
+    net.start()
+    CLI(net)
 
 
 if __name__ == "__main__":
