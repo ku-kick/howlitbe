@@ -18,6 +18,7 @@ def main():
             },
             n_overlays=2)
     net = howlitbe.containernet.DeploymentBuilder().build_from_topology(topology=topology)
+    howlitbe.containernet.log_network_summary(net)
     net.start()
     CLI(net)
 

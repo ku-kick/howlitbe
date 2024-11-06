@@ -35,6 +35,9 @@ try:
     from mininet.cli import CLI
     from mininet.link import TCLink
     from mininet.log import info, setLogLevel
+    from mininet.link import Link
+    from mininet.node import Node
+    HWL_DRY_RUN = False
 except ModuleNotFoundError as e:
     tired.logging.warning("Mocking containernet, because containernet is not installed")
     # The testbed environment is a non-virtualized machine without Containernet installed, keep to dry running
@@ -43,6 +46,7 @@ except ModuleNotFoundError as e:
     CLI = make_dry_run("CLI")
     TCLink = make_dry_run("TCLink")
     info = tired.logging.info
+    HWL_DRY_RUN = True
 
 
 class DeploymentBuilder:
@@ -101,6 +105,21 @@ def run_topology(topology: howlitbe.topology.Topology):
     """
     net = DeploymentBuilder().build_from_topology(topology)
     net.start()
+
+
+def log_network_summary(net: Containernet):
+    from itertools import chain
+    if HWL_DRY_RUN:
+        tired.logging.warning("Unable to print network summary, containernet mock is used")
+        return
+    for o in chain(net.hosts, net.switches, net.controllers, net.links):
+        if isinstance(o, Link):
+            tired.logging.info("Link", str(o))
+        elif isinstance(o, Node):
+            interfaces = o.intfs.values()
+            tired.logging.info("Node", o.name,
+                    "with interfaces",
+                    ', '.join(map(lambda i: f"{i.name} ({i.ip})", interfaces)))
 
 
 def test_run_topology():
