@@ -10,8 +10,8 @@ import tired.logging
 # If containernet is not installed (development environment), dry run
 
 def make_dry_run(classname: str):
-    def mock_function(*args, **kwargs):
-        pass
+    def mock_function(self, *args, **kwargs):
+        return self
 
     class _DryRun:
         def __init__(self, *args, **kwargs):
@@ -74,26 +74,27 @@ class DeploymentBuilder:
                 # TODO: Limits
                 # TODO: assign IP to the host
                 tired.logging.debug("Adding host", host_name, node.get_ip4_string())
-                n = net.addHost(host_name)
+                n = net.addHost(host_name, ip=node.get_ip4_string(), prefixLen=node.get_ip4_prefixlen())
                 nodemap[hash(node)] = n
             elif isinstance(node, howlitbe.topology.Container):
                 container_name = "d" + str(node.get_id())
                 # TODO: Limits
-                command = "python app.py"  # Command to execute
+                command = "python app.py"  # TODO: Command to execute
                 tired.logging.debug("Adding docker", container_name, "on node",
-                        str(node.node.get_id()), node.node.get_ip4_string(),
+                        str(node.node.get_id()), "ip", node.node.get_ip4_string(),
                         "application", node.name)
-                n = net.addDocker('.'.join("docker", str(node.node.get_id()), str(node.get_id()), node.name),
-                        ip=node.node.get_ip4_string(), dcmd=command, dimage=f"{node.name}:latest")
-                nodemap[hash(node)] = n
+                n = net.addDocker('.'.join(["docker", str(node.node.get_id()), str(node.get_id()), node.name]),
+                        ip=node.node.get_ip4_string(), dcmd=command, dimage=f"{node.name}:latest",
+                        prefixLen=node.node.get_ip4_prefixlen())
         # Add links b/w the components of the network
         for e in nx_graph.edges():
             edge = nx_graph.edges[e]["relationship"]
-            node1 = edge.node1
-            node2 = edge.node2
-            tired.logging.debug("Creating link between", node1.get_summary(), "and", node2.get_summary())
-            netlink = net.addLink(nodemap[hash(node1)], nodemap[hash(node2)])
-            nodemap[hash(edge)] = netlink  # JIC
+            if isinstance(edge, howlitbe.topology.PhysicalLink):
+                node1 = edge.node1
+                node2 = edge.node2
+                tired.logging.debug("Creating physical link between", node1.get_summary(), "and", node2.get_summary())
+                netlink = net.addLink(nodemap[hash(node1)], nodemap[hash(node2)])
+                nodemap[hash(edge)] = netlink  # JIC
 
         return net
 

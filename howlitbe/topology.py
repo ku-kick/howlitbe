@@ -30,13 +30,14 @@ class _Enumeration:
 
     def __init__(self):
         """
-        objtype - type of the object
+        regname - entry in the registry
         """
+        regname = self.__class__.__name__
         # Assign class identifier
-        if self.__class__.__name__ not in _Enumeration.__bound:
-            _Enumeration.__bound[self.__class__.__name__] = 0
-        self.__identifier = _Enumeration.__bound[self.__class__.__name__]
-        _Enumeration.__bound[self.__class__.__name__] += 1
+        if regname not in _Enumeration.__bound:
+            _Enumeration.__bound[regname] = 0
+        self.__identifier = _Enumeration.__bound[regname]
+        _Enumeration.__bound[regname] += 1
 
         # Assign absolute identifier
         self.__absolute_identifier = _Enumeration.__absolute_bound
@@ -54,7 +55,6 @@ class Node(_Enumeration):
     """
     Base class for network's node
     """
-    pass
     def __init__(self, cpufrac: float = None):
         """
         cpufrac: fraction of overall CPU time for a particular host. [NOUNIT], fraction value.
@@ -65,21 +65,42 @@ class Node(_Enumeration):
 
     def get_ip4(self) -> int:
         """ Generate IP by the node's id """
-        # TODO: the way IP gets acquired is incorrect. The IP is defined by the switch the host connects to
-        key = "HWL_IP_NETWORK"
-        value = os.getenv(key, "10.0.0.0/24")
-        tired.logging.info(f"Environment variable {key}=\"{value}\"")
-        network = ipaddress.ip_network(value)
+        network = ipaddress.ip_network(self.get_ip4_network())
         address = network.network_address
         address = struct.unpack(">I", address.packed)[0]
-        address = address | self.get_id()
+        address = address | (self.get_id() + 1)  # +1 to prevent from creating zero addresses
         return address
 
+    def get_ip4_network(self) -> str:
+        key = "HWL_IP_NETWORK"
+        value = os.getenv(key, "10.0.0.0/8")
+        tired.logging.info(f"Environment variable {key}=\"{value}\"")
+        return value
+
+    def get_ip4_prefixlen(self) -> int:
+        """
+        Returns the number of bits allocated for netmask (assumed that netmask
+        is formed by a continuous prefix)
+        """
+        network = ipaddress.ip_network(self.get_ip4_network())
+        return network.prefixlen
+
     def get_ip4_string(self) -> str:
+        # TODO: remove the use of this function. It will be assigned by containernet, no need to do so manually.
         return str(ipaddress.ip_address(self.get_ip4()))
 
     def get_summary(self) -> str:
-        return f"Node, ip={self.get_ip4_string()}, id={self.get_id()}"
+        return f"Node, ip={self.get_ip4_string()}, id={self.get_id() + 1}"
+
+
+def test_ip4_netmask():
+    """ The test """
+    os.environ["HWL_IP_NETWORK"] = "10.0.0.0/8"
+    node = Node(cpufrac=1.0)
+    tired.logging.debug("node", str(node.get_id()), "ip", str(node.get_ip4_string()), "netmask prefix length",
+            str(node.get_ip4_prefixlen()))
+    assert(node.get_ip4_string() == f"10.0.0.{node.get_id() + 1}")
+    assert(node.get_ip4_prefixlen() == 8)
 
 
 class Switch(_Enumeration):
@@ -107,6 +128,12 @@ class PhysicalLink(_Enumeration):
         self.node1 = node1  # Endpoint 1
         self.node2 = node2  # Endpoint 2
         self.bps = bandwidth  # Mininet (hence containernet too) allows setting bandwidth for a link. See "--bw" option.
+        _Enumeration.__init__(self)
+
+
+class Deployment(_Enumeration):
+    """ Metaclass for further extensions. Represents deployment of a container on a node """
+    def __init__(self):
         _Enumeration.__init__(self)
 
 
@@ -161,6 +188,9 @@ def test_enumeration():
 class Topology(nx.Graph):
     """
     - TODO: measure performance through creating artificial requests
+
+    NXGraph is used as the underlying storage.
+    - Association of a docker container w/ a node is represented as `Deployment` relationship
     """
 
     def __init__(self, graph: nx.Graph):
@@ -177,10 +207,12 @@ class Topology(nx.Graph):
         - blue - nodes
         """
         def __node_color(node_data):
-            if type(node_data) is Switch:
+            if isinstance(node_data, Switch):
                 color = "orange"
                 if node_data.is_gate:
                     color = "green"
+            elif isinstance(node_data, Container):
+                color = "yellow"
             else:
                 color = "blue"
 
@@ -303,6 +335,11 @@ class Topology(nx.Graph):
             link=PhysicalLink(node1=nodes[n], node2=switch, bandwidth=10)  # TODO: check the bw, it's wrong
             g.add_node(hash(switch), data=switch)
             g.add_edge(hash(node1), hash(switch), relationship=link)
+
+        # Store the containers in the topology
+        for c in range(n_containers):
+            g.add_node(hash(containers[c]), data=containers[c])
+            g.add_edge(hash(containers[c]), hash(containers[c].node), relationship=Deployment())
 
         # Build the object
         ret = Topology(g)
