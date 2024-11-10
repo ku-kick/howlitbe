@@ -69,22 +69,24 @@ class DeploymentBuilder:
                 tired.logging.debug(f"Built switch {switch_name}")
                 nodemap[hash(node)] = s
             elif isinstance(node, howlitbe.topology.Node):
-                # TODO: do we really need nodes for that?
+                # TODO: do we really need nodes for that? It might be so docker automatically create a host
                 host_name = "h" + str(node.get_id())
                 # TODO: Limits
-                # TODO: assign IP to the host
                 tired.logging.debug("Adding host", host_name, node.get_ip4_string())
-                n = net.addHost(host_name, ip=node.get_ip4_string(), prefixLen=node.get_ip4_prefixlen())
+                n = net.addHost(host_name,
+                        ip=node.get_ip4_string(),
+                        prefixLen=node.get_ip4_prefixlen())
                 nodemap[hash(node)] = n
             elif isinstance(node, howlitbe.topology.Container):
                 container_name = "d" + str(node.get_id())
                 # TODO: Limits
-                command = "python app.py"  # TODO: Command to execute
                 tired.logging.debug("Adding docker", container_name, "on node",
                         str(node.node.get_id()), "ip", node.node.get_ip4_string(),
                         "application", node.name)
                 n = net.addDocker('.'.join(["docker", str(node.node.get_id()), str(node.get_id()), node.name]),
-                        ip=node.node.get_ip4_string(), dcmd=command, dimage=f"{node.name}:latest",
+                        ip=node.node.get_ip4_string(),
+                        dcmd=node.command if node.command else None,
+                        dimage=f"{node.name}",
                         prefixLen=node.node.get_ip4_prefixlen())
         # Add links b/w the components of the network
         for e in nx_graph.edges():
@@ -130,5 +132,6 @@ def test_run_topology():
             images_count={
                 "image 1": 2,
             },
-            n_overlays=2)
+            n_overlays=2,
+            image_commands={"image 1": "echo wazzup, man"})
     howlitbe.containernet.run_topology(topology=topology)

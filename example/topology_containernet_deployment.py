@@ -20,10 +20,13 @@ def main():
                 "test_server:latest": 1,
                 "test_client:latest": 1,
             },
-            n_overlays=2)
+            n_overlays=2,
+            image_commands={})
     net = howlitbe.containernet.DeploymentBuilder().build_from_topology(topology=topology)
+    tired.logging.info("starting the network")
     net.start()
     howlitbe.containernet.log_network_summary(net)
+    tired.logging.info("Dropping into containernet shell")
     CLI(net)
 
 

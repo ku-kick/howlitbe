@@ -1,5 +1,3 @@
-import dataclasses
-
 import ipaddress
 import math
 import matplotlib
@@ -8,8 +6,6 @@ import networkx as nx
 import os
 import struct
 import tired.logging
-
-import howlitbe.topology
 
 
 class _Enumeration:
@@ -141,18 +137,26 @@ class Container(_Enumeration):
     """
     A virtualized application. Container (or VM) is running on a physical node.
     """
-    def __init__(self, node: Node, cpufrac: float, networkfrac: float, hddfrac: float, name: str):
+    def __init__(self,
+                node: Node,
+                cpufrac: float,
+                networkfrac: float,
+                hddfrac: float,
+                name: str,
+                command: str):
         """
         - cpufrac: scaled max. allowed CPU value from 0 to 1. [NOUNIT], fraction
         - networkfrac: scaled max. allowed network bandwidth. [NOUNIT], fraction
         - hddfrac: scaled max. fraction of bandwidth when accessing storage devices. [NOUNIT], fraction
-        - name: name of the container, or VM, that is getting deployed
+        - name: name of the container (image), or VM, that is getting deployed
+        - command: command to execute, empty, or None for no command
         """
         self.node = node  # Node which the container is running on
         self.cpufrac = cpufrac  # Docker allows setting cpu limits. See --cpu-quota, --cpu-period, --cpu-shares. See https://docs.docker.com/engine/containers/resource_constraints/#configure-the-default-cfs-scheduler
         self.networkfrac = networkfrac  # Docker does not allow setting network bandwidth. However, it is possible through tc command, see `man tc (RATES)`, and https://stackoverflow.com/questions/25497523/how-can-i-rate-limit-network-traffic-on-a-docker-container
         self.hddfrac = hddfrac  # Docker allows limiting access for a particular piece of block device, virtualized, or otherwise. See --device-read-bps, https://stackoverflow.com/questions/36145817/how-to-limit-io-speed-in-docker-and-share-file-with-system-in-the-same-time
         self.name = name
+        self.command = command
         _Enumeration.__init__(self)
 
 
@@ -161,8 +165,15 @@ class OverlayContainer(Container):
     Overlay container from the LB22 paper
     TODO: The assigned id will be within the type "OverlayContainer"
     """
-    def __init__(self, node: Node, cpufrac: float, networkfrac: float, hddfrac: float, name: str, overlay_id: int):
-        Container.__init__(self, node, cpufrac, networkfrac, hddfrac, name)
+    def __init__(self,
+                node: Node,
+                cpufrac: float,
+                networkfrac: float,
+                hddfrac: float,
+                name: str,
+                overlay_id: int,
+                command: str):
+        Container.__init__(self, node, cpufrac, networkfrac, hddfrac, name, command)
         self.overlay_id = overlay_id
 
 
@@ -174,7 +185,7 @@ def test_enumeration():
     tired.logging.debug("Created nodes w/ global ids", str(hash(n1)), str(hash(n2)))
     pl = PhysicalLink(n1, n2, 0.5)
     tired.logging.debug("Global id for", pl.__class__.__name__, "is", str(hash(pl)))
-    c1 = Container(node=n1, cpufrac=1.0, networkfrac=1.0, hddfrac=1.0, name="simpleserver")
+    c1 = Container(node=n1, cpufrac=1.0, networkfrac=1.0, hddfrac=1.0, name="simpleserver", command=None)
     tired.logging.debug("Global id for", c1.__class__.__name__, "is", str(hash(c1)))
     assert(pl.get_id() == 0)
     assert(n1.get_id() == 0)
@@ -228,12 +239,14 @@ class Topology(nx.Graph):
             n_gates: int,
             n_nodes: int,
             images_count: dict,
-            n_overlays: int):
+            n_overlays: int,
+            image_commands: dict):
         """
         Generates a virtualized network
         - n_switches_total - total number of switches (including externally-connected ones)
         - n_nodes - number of physical nodes
         - image_count - {image name: number of images}.
+        - image_commands: {"image name": "command"} dict. If no custom command is required, just omit the field
 
         - Containerized applications that will be running on the nodes.
         - Containers WILL BE distributed among nodes.
@@ -257,7 +270,14 @@ class Topology(nx.Graph):
             switches[i].is_gate = True
         # Generate containers
         n_containers = sum(images_count.values())
-        containers = [OverlayContainer(node=None, cpufrac=1.0, networkfrac=1.0, hddfrac=1.0, name="", overlay_id=None) for _ in range(n_containers)]
+        containers = [OverlayContainer(
+                node=None,
+                cpufrac=1.0,
+                networkfrac=1.0,
+                hddfrac=1.0,
+                name="",
+                overlay_id=None,
+                command=None) for _ in range(n_containers)]
 
         # Distribute containers among overlays (assign overlay types to containers)
         overlay_map = {o: list() for o in range(n_overlays)}  # {overlay id: list of containers}. Temporary index for fast access
@@ -269,6 +289,7 @@ class Topology(nx.Graph):
                     if images_count[i] > 0 and c < n_containers:
                         containers[c].overlay_id = o
                         containers[c].name = i  # Named after the image
+                        containers[c].command = image_commands[i] if i in image_commands else None
                         images_count[i] -= 1
                         overlay_map[o].append(containers[c])
                         c+=1
@@ -360,5 +381,6 @@ def test_lb22_topology_generation():
                 "image 1": 30,
                 "image 2": 30,
             },
-            n_overlays=5)
+            n_overlays=5,
+            image_commands={})
     topology.render()
