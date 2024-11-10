@@ -15,6 +15,7 @@ def make_dry_run(classname: str):
 
     class _DryRun:
         def __init__(self, *args, **kwargs):
+            self.intfs = dict()
             pass
 
         addDocker = mock_function
@@ -77,17 +78,6 @@ class DeploymentBuilder:
                         ip=node.get_ip4_string(),
                         prefixLen=node.get_ip4_prefixlen())
                 nodemap[hash(node)] = n
-            elif isinstance(node, howlitbe.topology.Container):
-                container_name = "d" + str(node.get_id())
-                # TODO: Limits
-                tired.logging.debug("Adding docker", container_name, "on node",
-                        str(node.node.get_id()), "ip", node.node.get_ip4_string(),
-                        "application", node.name)
-                n = net.addDocker(node.get_string_id(),
-                        ip=node.node.get_ip4_string(),
-                        dcmd=node.command if node.command else None,
-                        dimage=f"{node.name}",
-                        prefixLen=node.node.get_ip4_prefixlen())
         # Add links b/w the components of the network
         for e in nx_graph.edges():
             edge = nx_graph.edges[e]["relationship"]
@@ -97,6 +87,25 @@ class DeploymentBuilder:
                 tired.logging.debug("Creating physical link between", node1.get_summary(), "and", node2.get_summary())
                 netlink = net.addLink(nodemap[hash(node1)], nodemap[hash(node2)])
                 nodemap[hash(edge)] = netlink  # JIC
+        # Spawn containers. Must come after nodes, and links, because at that time interfaces are assigned to nodes
+        for i in nx_graph.nodes():
+            # TODO: It's impossible to add an interface directly before it is instatiated
+            node = nx_graph.nodes[i]["data"]
+            if isinstance(node, howlitbe.topology.Container):
+                # TODO: Limits
+                tired.logging.debug("Adding container", node.get_string_id(), "ip", node.node.get_ip4_string())
+                # Add docker
+                n = net.addDocker(node.get_string_id(),
+                        ip=node.node.get_ip4_string(),
+                        dcmd=node.command if node.command else None,
+                        dimage=f"{node.name}",
+                        prefixLen=node.node.get_ip4_prefixlen())
+                # Find interface, and assign the interface to Docker container, so it will share physical interface w/ the node it's being run on
+                for i in nodemap[hash(node.node)].intfs.values():
+                    if i.ip == node.node.get_ip4_string():  # TODO: XXX is there a better way to compare IPs?
+                        tired.logging.info("Adding interface", i.name, "to docker", node.get_string_id())
+                        n.addIntf(i)
+                        break
 
         return net
 
