@@ -159,6 +159,15 @@ class Container(_Enumeration):
         self.command = command
         _Enumeration.__init__(self)
 
+    def get_string_id(self) -> str:
+        """
+        From the node id, image id, etc. builds a unique identifier styled after
+        containernet naming scheme.
+        """
+        strid = '.'.join(["docker", "n" + str(self.node.get_id()), "c" + str(self.get_id()), self.name])
+        strid = ''.join([i if i.isalnum() or i in ".-_" else '.' for i in strid])
+        return strid
+
 
 class OverlayContainer(Container):
     """

@@ -83,7 +83,7 @@ class DeploymentBuilder:
                 tired.logging.debug("Adding docker", container_name, "on node",
                         str(node.node.get_id()), "ip", node.node.get_ip4_string(),
                         "application", node.name)
-                n = net.addDocker('.'.join(["docker", str(node.node.get_id()), str(node.get_id()), node.name]),
+                n = net.addDocker(node.get_string_id(),
                         ip=node.node.get_ip4_string(),
                         dcmd=node.command if node.command else None,
                         dimage=f"{node.name}",
