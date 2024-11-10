@@ -51,6 +51,9 @@ class Node(_Enumeration):
     """
     Base class for network's node
     """
+    __log_once = set()
+    """ To prevent unnecessary double logging"""
+
     def __init__(self, cpufrac: float = None):
         """
         cpufrac: fraction of overall CPU time for a particular host. [NOUNIT], fraction value.
@@ -70,7 +73,9 @@ class Node(_Enumeration):
     def get_ip4_network(self) -> str:
         key = "HWL_IP_NETWORK"
         value = os.getenv(key, "10.0.0.0/8")
-        tired.logging.info(f"Environment variable {key}=\"{value}\"")
+        if key not in Node.__log_once:
+            tired.logging.info(f"Environment variable {key}=\"{value}\"")
+            Node.__log_once = Node.__log_once.union({key})
         return value
 
     def get_ip4_prefixlen(self) -> int:
@@ -393,3 +398,20 @@ def test_lb22_topology_generation():
             n_overlays=5,
             image_commands={})
     topology.render()
+
+    # Ensure uniqueness of containers, nodes, switches
+    nset = set()
+    sset = set()
+    cset = set()
+    nx_graph = topology.as_nxgraph()
+    for i in nx_graph.nodes:
+        node = nx_graph.nodes[i]["data"]
+        if isinstance(node, Node):
+            assert hash(node) not in nset
+            nset.add(hash(node))
+        elif isinstance(node, Switch):
+            assert hash(node) not in sset
+            sset.add(hash(node))
+        elif isinstance(node, Container):
+            assert(hash(node) not in cset)
+            cset.add(hash(node))
