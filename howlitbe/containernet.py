@@ -6,6 +6,7 @@ import howlitbe.containernet
 import howlitbe.topology
 import os
 import tired.logging
+import networkx as nx
 
 # If containernet is not installed (development environment), dry run
 
@@ -88,6 +89,7 @@ class DeploymentBuilder:
                         dcmd=node.command if node.command else None,
                         dimage=f"{node.name}",
                         prefixLen=node.node.get_ip4_prefixlen())
+                nodemap[hash(node)] = n
         # Add links b/w the components of the network
         for e in nx_graph.edges():
             edge = nx_graph.edges[e]["relationship"]
@@ -97,6 +99,21 @@ class DeploymentBuilder:
                 tired.logging.debug("Creating physical link between", node1.get_summary(), "and", node2.get_summary())
                 netlink = net.addLink(nodemap[hash(node1)], nodemap[hash(node2)])
                 nodemap[hash(edge)] = netlink  # JIC
+        # Add links b/w docker containers, and switches
+        # Get a list of connected switches
+        for i in nx_graph.nodes():
+            container = nx_graph.nodes[i]["data"]
+            if isinstance(container, howlitbe.topology.Container):
+                for n in nx.node_connected_component(nx_graph, hash(container.node)):
+                    switch = nx_graph.nodes[n]["data"]
+                    if not isinstance(switch, howlitbe.topology.Switch):
+                        # We've got deployment relation, skip
+                        continue
+                    tired.logging.debug("Adding link between container",
+                            container.get_string_id(),
+                            "and switch #",
+                            str(switch.get_id()))
+                    net.addLink(nodemap[hash(container)], nodemap[hash(switch)])
 
         return net
 
