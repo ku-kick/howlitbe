@@ -11,7 +11,7 @@ url="example.com"
 
 with open('requirements.txt', 'r') as f:
     # "Parse" requirements, exclude comments, and emptylines
-    requirements = list(filter(lambda i: len(i) > 0 and not i.startswith('#'), map(lambda i: i.strip(), f.readlines())))
+    requirements = list(filter(lambda i: len(i) > 0 and not i.startswith('#'), f.readlines()))
 
 print(f"requirements: {requirements}")
 
@@ -25,7 +25,11 @@ setup(
         "howlitbe",
         "howlitbe.scenario",
     ],
-    package_data={},
+    package_data={
+        "howlitbe": [
+            "res/*.sh"
+        ]
+    },
     include_package_data=True,
     license="MIT",
     description=description,
@@ -40,7 +44,7 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    python_requires=">=3.7",
+    python_requires=">=3.6.9",
     version="0.0.1",
     entry_points=f"""
         [console_scripts]
