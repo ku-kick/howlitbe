@@ -44,7 +44,7 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    python_requires=">=3.6.9",
+    python_requires=">=3.8.0",
     version="0.0.1",
     entry_points=f"""
         [console_scripts]
