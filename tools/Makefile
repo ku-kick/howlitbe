@@ -11,7 +11,7 @@
 
 OUT=./out
 
-post-mininet: $(OUT) $(OUT)/aptupdate $(OUT)/aptinstall-docker
+post-mininet: $(OUT) $(OUT)/aptupdate $(OUT)/aptinstall-docker $(OUT)/aptinstall-cgroupfs-mount
 
 $(OUT)/aptupdate:
 	sudo apt update && touch $@
@@ -27,13 +27,11 @@ $(OUT)/download-%:
 	curl -L $* -o $(OUT)/$*
 	touch $@
 
-$(OUT)/aptinstall-docker: $(OUT)/aptinstall-docker-compose-plugin_2.6.0~ubuntu-bionic_arm64.deb $(OUT)/aptinstall-docker-ce_24.0.2-1~ubuntu.18.04~bionic_arm64.deb
-
 # Install docker, create a marker file telling us that docker is aptinstall
-#$(OUT)/aptinstall-docker: $(OUT)/docker.deb
-#	@echo Installing docker from $<
-#	if ! sudo dpkg -i $< ; then sudo apt install --fix-broken ; fi
-#	sudo dpkg -i $< && touch $@
+$(OUT)/aptinstall-docker: $(OUT)/docker.deb
+	@echo Installing docker from $<
+	if ! sudo dpkg -i $< ; then sudo apt install --fix-broken ; fi
+	sudo dpkg -i $< && touch $@
 
 $(OUT)/aptinstall-%:
 	@echo "Trying to install $* using apt..."
