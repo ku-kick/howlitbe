@@ -5,16 +5,16 @@
 #unshare --mount '/bin/bash -c "mkdir -p /tmp/$1 ;  mount --bind /tmp/$1 /var ; containerd & && dockerd"'
 
 # Handle cgroupfs
-cgroupfs-umount
-cgroupfs-mount
+#cgroupfs-umount
+#cgroupfs-mount
 
 # Docker uses /var to detect conflicts b/w running docker instanes. Substitude w/ an empty /var directory
 D=$1
-echo Mountint /var
+echo Mounting /tmp/$D as /var
 mkdir -p /tmp/$D
 mount --bind /tmp/$D /var
-/bin/bash
+# /bin/bash
 
 # Run daemons
-containerd &
-dockerd
+containerd && dockerd &
+/bin/bash

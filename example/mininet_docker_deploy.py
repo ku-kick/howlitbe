@@ -10,9 +10,13 @@ import mininet.net
 import mininet.node
 import pathlib
 import tired.logging
+import os
 
 
 def main():
+    os.system('cgroupfs-umount')
+    os.system('cgroupfs-mount')
+
     setLogLevel('debug')
     tired.logging.set_level(tired.logging.DEBUG)
 
@@ -36,9 +40,14 @@ def main():
 
     # Deploy docker in the network namespaces of hosts h1, and h2
     deployscriptpath = pathlib.Path(__file__).resolve().parent / "docker-deploy-debian.sh"
-    cmd = f'unshare --mount --pid --fork /bin/bash {deployscriptpath}&'
+
+    cmd = f'unshare --mount --pid --fork /bin/bash {deployscriptpath} 1&'
     tired.logging.info(f"Deploying Docker on h1")
     h1.sendCmd(cmd)
+
+    cmd = f'unshare --mount --pid --fork /bin/bash {deployscriptpath} 2&'
+    tired.logging.info(f"Deploying Docker on h2")
+    h2.sendCmd(cmd)
 
     # Drop into Mininet shell
     tired.logging.info("Dropping into containernet shell")
