@@ -2,6 +2,7 @@
 Generates a simple topology, and deploys it on a containernet network
 """
 
+import time
 from mininet.cli import CLI
 from mininet.log import setLogLevel
 import howlitbe.mininet
@@ -11,6 +12,7 @@ import mininet.node
 import pathlib
 import tired.logging
 import os
+import tired.command
 
 
 def main():
@@ -42,9 +44,20 @@ def main():
     deployscriptpath = pathlib.Path(__file__).resolve().parent / "docker-deploy-debian.sh"
     hosts = [h1, h2]
     for i in range(2):
-        cmd = f'unshare --mount --pid --fork --ipc --cgroup /bin/bash {deployscriptpath} {i}'
-        hosts[i].sendCmd(cmd)
-    tired.logging.info(f"Deploying Docker on h1")
+        mountname = f'/tmp/mininet-{i}-mount'
+        tired.command.execute(f'sudo rm -rf {mountname}')
+        tired.command.execute(f'sudo mkdir -p {mountname}')
+        tired.logging.info(f'For host "{hosts[i].name}: mounting {mountname} to /var')
+        hosts[i].sendCmd(f'sudo mount --bind {mountname} /var')
+        hosts[i].waitOutput()
+        tired.logging.info(f"Launching containerd on {hosts[i].name}")
+        hosts[i].sendCmd('containerd &')
+        hosts[i].waitOutput()
+        tired.logging.info(f"Launching containerd on {hosts[i].name}")
+        time.sleep(3) # Crutch: containerd needs some time to launch
+        tired.logging.info(f"Deploying Docker on {hosts[i].name}")
+        hosts[i].sendCmd('dockerd &')
+        hosts[i].waitOutput()
 
     # Drop into Mininet shell
     tired.logging.info("Dropping into containernet shell")

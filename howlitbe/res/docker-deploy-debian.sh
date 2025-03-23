@@ -9,12 +9,14 @@
 #cgroupfs-mount
 
 # Docker uses /var to detect conflicts b/w running docker instanes. Substitude w/ an empty /var directory
-D=$1
+D=mininet-mount-var-$1
+rm -rf /tmp/$D
 echo Mounting /tmp/$D as /var
 mkdir -p /tmp/$D
 mount --bind /tmp/$D /var
 # /bin/bash
 
 # Run daemons
-containerd && dockerd &
-/bin/bash
+containerd &
+sleep 10
+dockerd

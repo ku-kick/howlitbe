@@ -1,2 +1,2 @@
 #!/bin/bash
-rsync -rva --exclude .git --exclude venv ../howlitbe ubuntu@192.168.138.140:~
+rsync -rva --exclude .git --exclude venv ../howlitbe ubuntu@172.16.79.128:~
