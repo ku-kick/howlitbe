@@ -29,3 +29,8 @@ pip install .
 # ???
 # PROFIT!
 ```
+
+# Installation
+
+- Make sure Mininet is installed on your (virtual) machine;
+- run `cd tools ; ./mininet-postinstall.sh` to complete your installation w/ Docker, and whatever dependencies there are;

@@ -1,5 +1,3 @@
-import dataclasses
-
 import ipaddress
 import math
 import matplotlib
@@ -8,8 +6,6 @@ import networkx as nx
 import os
 import struct
 import tired.logging
-
-import howlitbe.topology
 
 
 class _Enumeration:
@@ -30,13 +26,14 @@ class _Enumeration:
 
     def __init__(self):
         """
-        objtype - type of the object
+        regname - entry in the registry
         """
+        regname = self.__class__.__name__
         # Assign class identifier
-        if self.__class__.__name__ not in _Enumeration.__bound:
-            _Enumeration.__bound[self.__class__.__name__] = 0
-        self.__identifier = _Enumeration.__bound[self.__class__.__name__]
-        _Enumeration.__bound[self.__class__.__name__] += 1
+        if regname not in _Enumeration.__bound:
+            _Enumeration.__bound[regname] = 0
+        self.__identifier = _Enumeration.__bound[regname]
+        _Enumeration.__bound[regname] += 1
 
         # Assign absolute identifier
         self.__absolute_identifier = _Enumeration.__absolute_bound
@@ -54,7 +51,9 @@ class Node(_Enumeration):
     """
     Base class for network's node
     """
-    pass
+    __log_once = set()
+    """ To prevent unnecessary double logging"""
+
     def __init__(self, cpufrac: float = None):
         """
         cpufrac: fraction of overall CPU time for a particular host. [NOUNIT], fraction value.
@@ -65,17 +64,44 @@ class Node(_Enumeration):
 
     def get_ip4(self) -> int:
         """ Generate IP by the node's id """
-        key = "HWL_IP_NETWORK"
-        value = os.getenv(key, "10.0.0.0/24")
-        tired.logging.info(f"Environment variable {key}=\"{value}\"")
-        network = ipaddress.ip_network(value)
+        network = ipaddress.ip_network(self.get_ip4_network())
         address = network.network_address
         address = struct.unpack(">I", address.packed)[0]
-        address = address | self.get_id()
+        address = address | (self.get_id() + 1)  # +1 to prevent from creating zero addresses
         return address
 
+    def get_ip4_network(self) -> str:
+        key = "HWL_IP_NETWORK"
+        value = os.getenv(key, "10.0.0.0/8")
+        if key not in Node.__log_once:
+            tired.logging.info(f"Environment variable {key}=\"{value}\"")
+            Node.__log_once = Node.__log_once.union({key})
+        return value
+
+    def get_ip4_prefixlen(self) -> int:
+        """
+        Returns the number of bits allocated for netmask (assumed that netmask
+        is formed by a continuous prefix)
+        """
+        network = ipaddress.ip_network(self.get_ip4_network())
+        return network.prefixlen
+
     def get_ip4_string(self) -> str:
+        # TODO: remove the use of this function. It will be assigned by containernet, no need to do so manually.
         return str(ipaddress.ip_address(self.get_ip4()))
+
+    def get_summary(self) -> str:
+        return f"Node, ip={self.get_ip4_string()}, id={self.get_id() + 1}"
+
+
+def test_ip4_netmask():
+    """ The test """
+    os.environ["HWL_IP_NETWORK"] = "10.0.0.0/8"
+    node = Node(cpufrac=1.0)
+    tired.logging.debug("node", str(node.get_id()), "ip", str(node.get_ip4_string()), "netmask prefix length",
+            str(node.get_ip4_prefixlen()))
+    assert(node.get_ip4_string() == f"10.0.0.{node.get_id() + 1}")
+    assert(node.get_ip4_prefixlen() == 8)
 
 
 class Switch(_Enumeration):
@@ -88,6 +114,9 @@ class Switch(_Enumeration):
         """
         _Enumeration.__init__(self)
         self.is_gate = is_gate
+
+    def get_summary(self) -> str:
+        return f"Switch, id={self.get_id()}"
 
 
 class PhysicalLink(_Enumeration):
@@ -103,23 +132,47 @@ class PhysicalLink(_Enumeration):
         _Enumeration.__init__(self)
 
 
+class Deployment(_Enumeration):
+    """ Metaclass for further extensions. Represents deployment of a container on a node """
+    def __init__(self):
+        _Enumeration.__init__(self)
+
+
 class Container(_Enumeration):
     """
     A virtualized application. Container (or VM) is running on a physical node.
     """
-    def __init__(self, node: Node, cpufrac: float, networkfrac: float, hddfrac: float, name: str):
+    def __init__(self,
+                node: Node,
+                cpufrac: float,
+                networkfrac: float,
+                hddfrac: float,
+                name: str,
+                command: str):
         """
         - cpufrac: scaled max. allowed CPU value from 0 to 1. [NOUNIT], fraction
         - networkfrac: scaled max. allowed network bandwidth. [NOUNIT], fraction
         - hddfrac: scaled max. fraction of bandwidth when accessing storage devices. [NOUNIT], fraction
-        - name: name of the container, or VM, that is getting deployed
+        - name: name of the container (image), or VM, that is getting deployed
+        - command: command to execute, empty, or None for no command
         """
         self.node = node  # Node which the container is running on
         self.cpufrac = cpufrac  # Docker allows setting cpu limits. See --cpu-quota, --cpu-period, --cpu-shares. See https://docs.docker.com/engine/containers/resource_constraints/#configure-the-default-cfs-scheduler
         self.networkfrac = networkfrac  # Docker does not allow setting network bandwidth. However, it is possible through tc command, see `man tc (RATES)`, and https://stackoverflow.com/questions/25497523/how-can-i-rate-limit-network-traffic-on-a-docker-container
         self.hddfrac = hddfrac  # Docker allows limiting access for a particular piece of block device, virtualized, or otherwise. See --device-read-bps, https://stackoverflow.com/questions/36145817/how-to-limit-io-speed-in-docker-and-share-file-with-system-in-the-same-time
         self.name = name
+        self.command = command
         _Enumeration.__init__(self)
+
+    def get_string_id(self) -> str:
+        """
+        From the node id, image id, etc. builds a unique identifier styled after
+        containernet naming scheme.
+        """
+        return "d" + str(self.get_id())
+        strid = '.'.join(["docker", "n" + str(self.node.get_id()), "c" + str(self.get_id()), self.name])
+        strid = ''.join([i if i.isalnum() or i in ".-_" else '.' for i in strid])
+        return strid
 
 
 class OverlayContainer(Container):
@@ -127,8 +180,15 @@ class OverlayContainer(Container):
     Overlay container from the LB22 paper
     TODO: The assigned id will be within the type "OverlayContainer"
     """
-    def __init__(self, node: Node, cpufrac: float, networkfrac: float, hddfrac: float, name: str, overlay_id: int):
-        Container.__init__(self, node, cpufrac, networkfrac, hddfrac, name)
+    def __init__(self,
+                node: Node,
+                cpufrac: float,
+                networkfrac: float,
+                hddfrac: float,
+                name: str,
+                overlay_id: int,
+                command: str):
+        Container.__init__(self, node, cpufrac, networkfrac, hddfrac, name, command)
         self.overlay_id = overlay_id
 
 
@@ -140,7 +200,7 @@ def test_enumeration():
     tired.logging.debug("Created nodes w/ global ids", str(hash(n1)), str(hash(n2)))
     pl = PhysicalLink(n1, n2, 0.5)
     tired.logging.debug("Global id for", pl.__class__.__name__, "is", str(hash(pl)))
-    c1 = Container(node=n1, cpufrac=1.0, networkfrac=1.0, hddfrac=1.0, name="simpleserver")
+    c1 = Container(node=n1, cpufrac=1.0, networkfrac=1.0, hddfrac=1.0, name="simpleserver", command=None)
     tired.logging.debug("Global id for", c1.__class__.__name__, "is", str(hash(c1)))
     assert(pl.get_id() == 0)
     assert(n1.get_id() == 0)
@@ -154,6 +214,9 @@ def test_enumeration():
 class Topology(nx.Graph):
     """
     - TODO: measure performance through creating artificial requests
+
+    NXGraph is used as the underlying storage.
+    - Association of a docker container w/ a node is represented as `Deployment` relationship
     """
 
     def __init__(self, graph: nx.Graph):
@@ -170,10 +233,12 @@ class Topology(nx.Graph):
         - blue - nodes
         """
         def __node_color(node_data):
-            if type(node_data) is Switch:
+            if isinstance(node_data, Switch):
                 color = "orange"
                 if node_data.is_gate:
                     color = "green"
+            elif isinstance(node_data, Container):
+                color = "yellow"
             else:
                 color = "blue"
 
@@ -189,12 +254,14 @@ class Topology(nx.Graph):
             n_gates: int,
             n_nodes: int,
             images_count: dict,
-            n_overlays: int):
+            n_overlays: int,
+            image_commands: dict):
         """
         Generates a virtualized network
         - n_switches_total - total number of switches (including externally-connected ones)
         - n_nodes - number of physical nodes
         - image_count - {image name: number of images}.
+        - image_commands: {"image name": "command"} dict. If no custom command is required, just omit the field
 
         - Containerized applications that will be running on the nodes.
         - Containers WILL BE distributed among nodes.
@@ -218,7 +285,14 @@ class Topology(nx.Graph):
             switches[i].is_gate = True
         # Generate containers
         n_containers = sum(images_count.values())
-        containers = [OverlayContainer(node=None, cpufrac=1.0, networkfrac=1.0, hddfrac=1.0, name="", overlay_id=None) for _ in range(n_containers)]
+        containers = [OverlayContainer(
+                node=None,
+                cpufrac=1.0,
+                networkfrac=1.0,
+                hddfrac=1.0,
+                name="",
+                overlay_id=None,
+                command=None) for _ in range(n_containers)]
 
         # Distribute containers among overlays (assign overlay types to containers)
         overlay_map = {o: list() for o in range(n_overlays)}  # {overlay id: list of containers}. Temporary index for fast access
@@ -230,6 +304,7 @@ class Topology(nx.Graph):
                     if images_count[i] > 0 and c < n_containers:
                         containers[c].overlay_id = o
                         containers[c].name = i  # Named after the image
+                        containers[c].command = image_commands[i] if i in image_commands else None
                         images_count[i] -= 1
                         overlay_map[o].append(containers[c])
                         c+=1
@@ -297,6 +372,11 @@ class Topology(nx.Graph):
             g.add_node(hash(switch), data=switch)
             g.add_edge(hash(node1), hash(switch), relationship=link)
 
+        # Store the containers in the topology
+        for c in range(n_containers):
+            g.add_node(hash(containers[c]), data=containers[c])
+            g.add_edge(hash(containers[c]), hash(containers[c].node), relationship=Deployment())
+
         # Build the object
         ret = Topology(g)
         return ret
@@ -316,5 +396,23 @@ def test_lb22_topology_generation():
                 "image 1": 30,
                 "image 2": 30,
             },
-            n_overlays=5)
+            n_overlays=5,
+            image_commands={})
     topology.render()
+
+    # Ensure uniqueness of containers, nodes, switches
+    nset = set()
+    sset = set()
+    cset = set()
+    nx_graph = topology.as_nxgraph()
+    for i in nx_graph.nodes:
+        node = nx_graph.nodes[i]["data"]
+        if isinstance(node, Node):
+            assert hash(node) not in nset
+            nset.add(hash(node))
+        elif isinstance(node, Switch):
+            assert hash(node) not in sset
+            sset.add(hash(node))
+        elif isinstance(node, Container):
+            assert(hash(node) not in cset)
+            cset.add(hash(node))

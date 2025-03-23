@@ -1,13 +1,13 @@
 """
-This module is responsible for deploying, and running containernet networks.
+Wrapper over mininet extending it w/ required functionality (primarily --
+deployment of docker containers).
 
-OBSOLETE. Turns out containernet does not really isolate docker nodes, so I'll
-build on top of mininet to integrate docker functionality without really
-changing mininet.
+Using this wrapper requires extended version of Mininet environment (VM), the
+one w/ docker. Please refer to 'tools/mininet-postinstall.sh'
 """
 
 
-import howlitbe.containernet
+import howlitbe.mininet
 import howlitbe.topology
 import os
 import tired.logging
@@ -36,7 +36,7 @@ def make_dry_run(classname: str):
 
 
 try:
-    from mininet.net import Containernet
+    from mininet.net import Mininet
     from mininet.node import Controller
     from mininet.cli import CLI
     from mininet.link import TCLink
@@ -47,7 +47,7 @@ try:
 except ModuleNotFoundError as e:
     tired.logging.warning("Mocking containernet, because containernet is not installed")
     # The testbed environment is a non-virtualized machine without Containernet installed, keep to dry running
-    Containernet = make_dry_run("Conainernet")
+    Containernet = make_dry_run("Mininet")
     Controller = make_dry_run("Controller")
     CLI = make_dry_run("CLI")
     TCLink = make_dry_run("TCLink")
@@ -58,9 +58,9 @@ except ModuleNotFoundError as e:
 class DeploymentBuilder:
     """ Builds Containernet object from a given topology """
 
-    def build_from_topology(self, topology: howlitbe.topology.Topology) -> Containernet:
+    def build_from_topology(self, topology: howlitbe.topology.Topology) -> Mininet:
         # Initialize the network
-        net = Containernet(controller=Controller)
+        net = Mininet(controller=Controller)
         # Create one default controller w/ a predefined name
         net.addController('c0')
         nodemap = dict()  # A temporary index for addressing the created mininet/containernet entities later
@@ -111,7 +111,7 @@ class DeploymentBuilder:
             if isinstance(container, howlitbe.topology.Container):
                 for n in nx.node_connected_component(nx_graph, hash(container.node)):
                     switch = nx_graph.nodes[n]["data"]
-                    if not isinstance(switch, howlitbe.topology.Switch):
+                    if isinstance(switch, howlitbe.topology.Switch):
                         # We've got deployment relation, skip
                         continue
                     tired.logging.debug("Adding link between container",
@@ -132,7 +132,7 @@ def run_topology(topology: howlitbe.topology.Topology):
     net.start()
 
 
-def log_network_summary(net: Containernet):
+def log_network_summary(net: Mininet):
     from itertools import chain
     if HWL_DRY_RUN:
         tired.logging.warning("Unable to print network summary, containernet mock is used")
@@ -156,4 +156,4 @@ def test_run_topology():
             },
             n_overlays=2,
             image_commands={"image 1": "echo wazzup, man"})
-    howlitbe.containernet.run_topology(topology=topology)
+    howlitbe.Mininet.run_topology(topology=topology)
