@@ -14,5 +14,6 @@ for i in $LIST ; do
 		echo ERROR: file $i/Dockerfile does not exist
 		exit 1
 	fi
+	docker build -t $i:latest $i
 done
 echo Will build the following images: $LIST

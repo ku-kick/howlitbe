@@ -15,7 +15,18 @@ import os
 import tired.command
 
 
+H1_CONTAINER_NAME = "docker_simple_http_server"
+H2_CONTAINER_NAME = "docker_simple_http_client"
+
+
 def main():
+    # Save containers into a certain directory, so they can be ported by the deployed containers
+    # TODO: add "already exists" check
+    image_tar_output_dir = '/tmp/dockerimages'
+    tired.command.execute(f'mkdir -p {image_tar_output_dir}')
+    tired.command.execute(f'docker save -o {image_tar_output_dir}/{H1_CONTAINER_NAME} {H1_CONTAINER_NAME}')
+    tired.command.execute(f'docker save -o {image_tar_output_dir}/{H2_CONTAINER_NAME} {H2_CONTAINER_NAME}')
+    
     os.system('cgroupfs-umount')
     os.system('cgroupfs-mount')
 
@@ -37,6 +48,7 @@ def main():
     net.start()
     c1.start()
     s1.start([c1])
+    h2.setIP("10.0.0.4")
     # Get network summary
     # howlitbe.mininet.log_network_summary(net)
 
@@ -47,16 +59,31 @@ def main():
         mountname = f'/tmp/mininet-{i}-mount'
         tired.command.execute(f'sudo rm -rf {mountname}')
         tired.command.execute(f'sudo mkdir -p {mountname}')
+
+        # Bind var/ to sandbox docker instance
         tired.logging.info(f'For host "{hosts[i].name}: mounting {mountname} to /var')
         hosts[i].sendCmd(f'sudo mount --bind {mountname} /var')
         hosts[i].waitOutput()
+
+        # Bind container images' directory for being used by running docker instances
+        hosts[i].sendCmd(f'mkdir -p /var/dockerimages && mount --bind {image_tar_output_dir} /var/dockerimages')
+        hosts[i].waitOutput()
+
         tired.logging.info(f"Launching containerd on {hosts[i].name}")
         hosts[i].sendCmd('containerd &')
         hosts[i].waitOutput()
+
         tired.logging.info(f"Launching containerd on {hosts[i].name}")
-        time.sleep(3) # Crutch: containerd needs some time to launch
+        time.sleep(3) # TODO Crutch: containerd needs some time to launch
         tired.logging.info(f"Deploying Docker on {hosts[i].name}")
         hosts[i].sendCmd('dockerd &')
+        hosts[i].waitOutput()
+
+        # Load canned docker images
+        time.sleep(3) # TODO Crutch: dockerd needs some time to launch
+        hosts[i].sendCmd(f'docker load -i /var/dockerimages/{H1_CONTAINER_NAME}')
+        hosts[i].waitOutput()
+        hosts[i].sendCmd(f'docker load -i /var/dockerimages/{H2_CONTAINER_NAME}')
         hosts[i].waitOutput()
 
     # Drop into Mininet shell
