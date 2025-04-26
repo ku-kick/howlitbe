@@ -70,13 +70,13 @@ def main():
         hosts[i].waitOutput()
 
         tired.logging.info(f"Launching containerd on {hosts[i].name}")
-        hosts[i].sendCmd('containerd &')
+        hosts[i].sendCmd(f'containerd --log-level debug > /tmp/mininet-containerd-{i}.log 2>&1 &')
         hosts[i].waitOutput()
 
         tired.logging.info(f"Launching containerd on {hosts[i].name}")
         time.sleep(3) # TODO Crutch: containerd needs some time to launch
         tired.logging.info(f"Deploying Docker on {hosts[i].name}")
-        hosts[i].sendCmd('dockerd &')
+        hosts[i].sendCmd(f'dockerd --log-level debug > /tmp/mininet-dockerd-{i}.log 2>&1 &')
         hosts[i].waitOutput()
 
         # Load canned docker images
