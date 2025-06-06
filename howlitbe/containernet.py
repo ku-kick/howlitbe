@@ -128,8 +128,10 @@ def run_topology(topology: howlitbe.topology.Topology):
     Translates a given topology into containernet topology
     TODO: add limits (cpu, net, mem)
     """
-    net = DeploymentBuilder().build_from_topology(topology)
-    net.start()
+    import tired.ui
+    if not tired.ui.envvar("HWL_NO_MININET", type_=bool, default=False):
+        net = DeploymentBuilder().build_from_topology(topology)
+        net.start()
 
 
 def log_network_summary(net: Containernet):

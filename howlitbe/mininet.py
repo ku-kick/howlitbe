@@ -47,6 +47,7 @@ try:
 except ModuleNotFoundError as e:
     tired.logging.warning("Mocking containernet, because containernet is not installed")
     # The testbed environment is a non-virtualized machine without Containernet installed, keep to dry running
+    Mininet = make_dry_run("Mininet")
     Containernet = make_dry_run("Mininet")
     Controller = make_dry_run("Controller")
     CLI = make_dry_run("CLI")
@@ -58,7 +59,7 @@ except ModuleNotFoundError as e:
 class DeploymentBuilder:
     """ Builds Containernet object from a given topology """
 
-    def build_from_topology(self, topology: howlitbe.topology.Topology) -> Mininet:
+    def build_from_topology(self, topology: howlitbe.topology.Topology):
         # Initialize the network
         net = Mininet(controller=Controller)
         # Create one default controller w/ a predefined name
@@ -132,7 +133,7 @@ def run_topology(topology: howlitbe.topology.Topology):
     net.start()
 
 
-def log_network_summary(net: Mininet):
+def log_network_summary(net):
     from itertools import chain
     if HWL_DRY_RUN:
         tired.logging.warning("Unable to print network summary, containernet mock is used")
@@ -156,4 +157,4 @@ def test_run_topology():
             },
             n_overlays=2,
             image_commands={"image 1": "echo wazzup, man"})
-    howlitbe.Mininet.run_topology(topology=topology)
+    howlitbe.mininet.run_topology(topology=topology)

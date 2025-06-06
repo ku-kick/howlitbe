@@ -220,7 +220,7 @@ class Topology(nx.Graph):
     """
 
     def __init__(self, graph: nx.Graph):
-        self.graph = graph
+        self.graph: nx.Graph = graph
 
     def as_nxgraph(self):
         return self.graph
@@ -255,13 +255,20 @@ class Topology(nx.Graph):
             n_nodes: int,
             images_count: dict,
             n_overlays: int,
-            image_commands: dict):
+            image_commands: dict = dict()):
         """
         Generates a virtualized network
         - n_switches_total - total number of switches (including externally-connected ones)
         - n_nodes - number of physical nodes
         - image_count - {image name: number of images}.
         - image_commands: {"image name": "command"} dict. If no custom command is required, just omit the field
+
+        Objects assiociated w/ nodes, and links are put under "data" keyword.
+        Containers are linked to nodes
+
+        ```
+        colors = [__node_color(nx_graph.nodes[i]["data"]) for i in nx_graph.nodes()]
+        ```
 
         - Containerized applications that will be running on the nodes.
         - Containers WILL BE distributed among nodes.
