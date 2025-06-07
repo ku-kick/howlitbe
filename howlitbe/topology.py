@@ -60,7 +60,6 @@ class Node(_Enumeration):
         If None, no limit is used
         """
         _Enumeration.__init__(self)
-        self.cpufrac = cpufrac  # Mininet (hence containernet too) allows setting CPU time fraction through utilizing linux CFS (https://www.kernel.org/doc/html/latest/scheduler/sched-design-CFS.html). See "mininet", CPULimitedHost, and "setCPUFrac()" (https://mininet.org/api/classmininet_1_1node_1_1CPULimitedHost.html)
 
     def get_ip4(self) -> int:
         """ Generate IP by the node's id """
@@ -97,7 +96,7 @@ class Node(_Enumeration):
 def test_ip4_netmask():
     """ The test """
     os.environ["HWL_IP_NETWORK"] = "10.0.0.0/8"
-    node = Node(cpufrac=1.0)
+    node = Node()
     tired.logging.debug("node", str(node.get_id()), "ip", str(node.get_ip4_string()), "netmask prefix length",
             str(node.get_ip4_prefixlen()))
     assert(node.get_ip4_string() == f"10.0.0.{node.get_id() + 1}")
@@ -286,7 +285,7 @@ class Topology(nx.Graph):
                 str(images_count), str(n_overlays), "overlays")
 
         # Generate physical structure
-        nodes = [Node(cpufrac=1.0) for _ in range(n_nodes)]
+        nodes = [Node() for _ in range(n_nodes)]
         switches = [Switch(is_gate=False) for _ in range(n_switches_total)]
         for i in range(n_gates):
             switches[i].is_gate = True
