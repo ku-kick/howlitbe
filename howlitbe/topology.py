@@ -54,7 +54,7 @@ class Node(_Enumeration):
     __log_once = set()
     """ To prevent unnecessary double logging"""
 
-    def __init__(self, cpufrac: float = None):
+    def __init__(self):
         """
         cpufrac: fraction of overall CPU time for a particular host. [NOUNIT], fraction value.
         If None, no limit is used
@@ -224,7 +224,14 @@ class Topology(nx.Graph):
     def as_nxgraph(self):
         return self.graph
 
-    def render(self):
+    def add_edge(self, nodea: Node, nodeb: Node, link_details: PhysicalLink):
+        if hash(nodea) not in self.graph.nodes:
+            self.graph.add_node(hash(nodea), data=nodea)
+        if hash(nodeb) not in self.graph.nodes:
+            self.graph.add_node(hash(nodeb), data=nodeb)
+        self.graph.add_edge(hash(nodea), hash(nodeb), relationship=link_details)
+
+    def render(self, ax=None, show=True):
         """
         Render matplotlib plot w/ coloration:
         - orange - switches
@@ -244,8 +251,12 @@ class Topology(nx.Graph):
             return color
         nx_graph = self.as_nxgraph()
         colors = [__node_color(nx_graph.nodes[i]["data"]) for i in nx_graph.nodes()]
-        nx.draw(nx_graph, with_labels=True, node_color=colors)
-        matplotlib.pyplot.show()
+        pos = nx.spring_layout(nx_graph)
+        nx.draw(nx_graph, pos, with_labels=True, node_color=colors)
+        # nx.draw_networkx_edge_labels(nx_graph, pos)
+
+        if show:
+            matplotlib.pyplot.show()
 
     @staticmethod
     def new_topology_lb22_overlay(

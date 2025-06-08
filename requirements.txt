@@ -3,3 +3,5 @@ tired @ git+https://github.com/damurashov/TIRED.git@master
 networkx
 twoopt @ git+https://github.com/ku-kick/NetworkOptimizationModel@master
 matplotlib>=3.3.4
+customtkinter
+numpy
