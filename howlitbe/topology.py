@@ -212,10 +212,11 @@ def test_enumeration():
 
 class Topology(nx.Graph):
     """
-    - TODO: measure performance through creating artificial requests
-
     NXGraph is used as the underlying storage.
-    - Association of a docker container w/ a node is represented as `Deployment` relationship
+
+    edges, and nodes are addressed as integers.
+    Node, Switch, and PhysicalLayer instances are associated w/ nodes, and edges
+    under "data", or "relationship" keyword.
     """
 
     def __init__(self, graph: nx.Graph):
@@ -231,7 +232,7 @@ class Topology(nx.Graph):
             self.graph.add_node(hash(nodeb), data=nodeb)
         self.graph.add_edge(hash(nodea), hash(nodeb), relationship=link_details)
 
-    def render(self, ax=None, show=True):
+    def render(self, ax=None, show=True, get_edge_label_cb: callable=None):
         """
         Render matplotlib plot w/ coloration:
         - orange - switches
@@ -253,6 +254,11 @@ class Topology(nx.Graph):
         colors = [__node_color(nx_graph.nodes[i]["data"]) for i in nx_graph.nodes()]
         pos = nx.spring_layout(nx_graph)
         nx.draw(nx_graph, pos, with_labels=True, node_color=colors)
+
+        if get_edge_label_cb is not None:
+            edge_labels = {e[:2]:get_edge_label_cb(e[:2]) for e in nx_graph.edges}
+            nx.draw_networkx_edge_labels(nx_graph, pos, )
+
         # nx.draw_networkx_edge_labels(nx_graph, pos)
 
         if show:

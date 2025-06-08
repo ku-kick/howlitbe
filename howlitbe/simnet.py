@@ -127,6 +127,8 @@ class Simulation:
         """
         return self.previous_time
 
+    def transfer(node1: int, node2: int, )
+
     def step(self, dt, user_arg):
         """
         `user_arg` -- gets passed as a custom argument to all agent nodes that
@@ -135,7 +137,7 @@ class Simulation:
         """
         # Generate inbound traffic
         for inode in self.topology.as_nxgraph().nodes:
-            node_object = self.topology.as_nxgraph().nodes[inode]["data"]
+            node_object = self.topology.as_nxgraph().nodes[hash(inode)]["data"]
             if isinstance(node_object, howlitbe.topology.Switch) \
                         and node_object.is_gate:
                 data_amount = self.agent_index[inode].generate_inbound_data(
@@ -157,14 +159,14 @@ class Simulation:
             if isinstance(pd.deciding_inode, howlitbe.topology.Switch):
                 # Get neighboring nodes excluding those from backtrace
                 neighbor_nodes = [i for i in \
-                        self.topology.as_nxgraph().neighbors(pd.deciding_inode)
+                        self.topology.as_nxgraph().neighbors(hash(pd.deciding_inode))
                         if hash(i) not in map(hash,
                         pd.backtrace_nodes_as_node_objects)]
 
                 neighbor_agents = [self.agent_index[i] for i in neighbor_nodes]
                 neighbor_links = [
                         self.topology.as_nxgraph() \
-                        .get_edge_data(pd.deciding_inode, i)["data"] \
+                        .get_edge_data(hash(pd.deciding_inode), hash(i))["data"] \
                         for i in neighbor_nodes]
                 inext = agent_object.get_next_hop(
                         self,
@@ -177,15 +179,15 @@ class Simulation:
                 pd.backtrace_nodes_as_agents.append(
                         self.agent_index[pd.deciding_inode])
                 pd.backtrace_nodes_as_node_objects.append(pd.deciding_inode)
-                pd.deciding_inode = neighbor_nodes[inext]
+                pd.deciding_inode = neighbor_nodes[hash(inext)]
                 new_pending_data.append(pd)
                 # TODO save for the stat
             elif isinstance(pd.deciding_inode, howlitbe.topology.Node):
                 neighbor_agents = [self.agent_index[i] for i in \
                         self.topology.as_nxgraph().neighbors(pd.deciding_inode)]
                 neighbor_nodes = [i for i in \
-                        self.topology.as_nxgraph().neighbors(pd.deciding_inode)]
-                neighbor_links = [self.topology.edges([])]
+                        self.topology.as_nxgraph().neighbors(hash(pd.deciding_inode))]
+                neighbor_links = [self.topology.edges([hash(pd.deciding_inode)])]
                 processed_amnt = agent_object.calc_processed_data_amt_bytes(
                         self,
                         self.topology,
@@ -219,31 +221,41 @@ class SimTraceApp:
     """
     def __init__(self,
                 simulation: Simulation,
-                topology: howlitbe.topology.Topology):
+                topology: howlitbe.topology.Topology,
+                user_arg):
         self.simulation = simulation
         self.topology = topology
+        self.user_arg=user_arg
 
         ctk.set_appearance_mode("dark")
         self.root = ctk.CTk()
         self.root.geometry("1200x600")
-        self.root.title("Dynamic Scatter Plot")
+        self.root.title("SimTrace")
 
         # Frame for the plot
         self.frame = ctk.CTkFrame(master=self.root, fg_color="darkblue")
         self.frame.place(relx=0.33, rely=0.025, relwidth=0.66, relheight=0.95)
 
         # Button to update the plot
-        self.button = ctk.CTkButton(master=self.root, text="Update Graph", command=self.update_plot)
+        self.button = ctk.CTkButton(master=self.root, text="Step",
+                command=self.on_step)
         #self.button.place(relx=0.025, rely=0.25, width=300, height=50)
-        self.button.place(relx=0.025, rely=0.25)
+        self.button.place(relx=0.025, rely=0.25, relheight=0.04)
+
+        # TODO: process
+        self.button = ctk.CTkButton(master=self.root, text="Run",
+                command=self.update_plot)
+        #self.button.place(relx=0.025, rely=0.25, width=300, height=50)
+        self.button.place(relx=0.025, rely=0.30, relheight=0.04)
 
         # Entry for number of points
-        self.input = ctk.CTkEntry(master=self.root, placeholder_text="Number of Points", width=300, height=50)
-        self.input.place(relx=0.025, rely=0.5)
+        self.input = ctk.CTkEntry(master=self.root, placeholder_text="dt",
+                width=300, height=50)
+        self.input.place(relx=0.025, rely=0.35)
 
-        # Slider for point size
-        self.slider = ctk.CTkSlider(master=self.root, from_=1, to=1000, number_of_steps=999)
-        self.slider.place(relx=0.025, rely=0.75)
+        self.current_t = ctk.CTkLabel(master=self.root,
+                text=f"Current time: {simulation.get_previous_time()}")
+        self.current_t.place(relx=0.025, rely=0.45)
 
         # Initial plot
         self.fig, self.ax = plt.subplots(figsize=(8, 4))
@@ -254,8 +266,16 @@ class SimTraceApp:
     def run(self):
         self.root.mainloop()
 
+    def on_step(self):
+        self.simulation.step(float(self.input.get()), self.user_arg)
+        self.update_plot()
+        self.update_ui()
+
     def update_plot(self):
         self.topology.render(ax=self.ax, show=False)
+
+    def update_ui(self):
+        self.current_t.configure(text=f"Current time: {self.simulation.get_previous_time()}")
 
     def update_plot_legacy(self):
         # Clear the previous plot
@@ -298,7 +318,9 @@ def test_inbound_passing_w_termination():
     simulation = Simulation(topology,
             RandomPassNodeAgent,
             None)
-    simapp = SimTraceApp(simulation=simulation, topology=topology)
+    simapp = SimTraceApp(simulation=simulation,
+            topology=topology,
+            user_arg=None)
     simapp.run()
 
     if False:
