@@ -223,6 +223,15 @@ class Topology(nx.Graph):
         self.graph: nx.Graph = graph
 
     def as_nxgraph(self):
+        """
+        Returns networkx graph.
+        Here is an example of how Node, or Switch object can be accessed:
+
+        ```
+        topology.as_nxgraph().nodes[hash(node_object)]
+        ```
+        where `node_object` is of type `Node`
+        """
         return self.graph
 
     def add_edge(self, nodea: Node, nodeb: Node, link_details: PhysicalLink):
@@ -232,7 +241,8 @@ class Topology(nx.Graph):
             self.graph.add_node(hash(nodeb), data=nodeb)
         self.graph.add_edge(hash(nodea), hash(nodeb), relationship=link_details)
 
-    def render(self, ax=None, show=True, get_edge_label_cb: callable=None):
+    def render(self, ax=None, show=True, get_node_label_cb: callable=None,
+                get_edge_label_cb: callable=None):
         """
         Render matplotlib plot w/ coloration:
         - orange - switches
@@ -253,13 +263,20 @@ class Topology(nx.Graph):
         nx_graph = self.as_nxgraph()
         colors = [__node_color(nx_graph.nodes[i]["data"]) for i in nx_graph.nodes()]
         pos = nx.spring_layout(nx_graph)
-        nx.draw(nx_graph, pos, with_labels=True, node_color=colors)
+
+        labels=None
+        if get_node_label_cb is not None:
+            labels = dict()
+            for inode in nx_graph.nodes:
+                labels[inode] = get_node_label_cb(inode)
+
+        nx.draw(nx_graph, pos, ax=ax, with_labels=True, labels=labels,
+                node_color=colors)
 
         if get_edge_label_cb is not None:
-            edge_labels = {e[:2]:get_edge_label_cb(e[:2]) for e in nx_graph.edges}
-            nx.draw_networkx_edge_labels(nx_graph, pos, )
-
-        # nx.draw_networkx_edge_labels(nx_graph, pos)
+            edge_labels = {e[:2]:get_edge_label_cb(e[0], e[1]) for e in nx_graph.edges}
+            nx.draw_networkx_edge_labels(nx_graph, pos,
+                    edge_labels=edge_labels)
 
         if show:
             matplotlib.pyplot.show()
