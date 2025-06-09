@@ -44,7 +44,7 @@ class NodeAgent:
                 neighbor_node_ids: list[int], # Neighbors represented as howlitbe.topology.Node objects
                 self_as_node_object: howlitbe.topology.Node,
                 dt,
-                data_amt,
+                data_amnt,
                 user_arg=None) -> float:
         return data_amt
 
@@ -70,16 +70,15 @@ class RandomPassNodeAgent(NodeAgent):
                 neighbor_node_ids: list, # Neighbors represented as howlitbe.topology.Node objects
                 self_as_node_object: howlitbe.topology.Node,
                 dt,
-                data_amt,
+                data_amnt,
                 user_arg=None):
-        return data_amt * 0.995
+        return data_amnt * 0.995
 
     def get_next_hop(self,
                 simulation,
                 topology: howlitbe.topology.Topology,
                 neighbors_as_agents: list, # Neighbors represented as NodeAgent objects
                 neighbor_node_ids: list, # Neighbors represented as howlitbe.topology.Node objects
-                neighboring_physical_links: list[howlitbe.topology.PhysicalLink], # Physical links to neighbors
                 self_as_node_object: howlitbe.topology.Node,
                 dt,
                 user_arg=None):
@@ -159,11 +158,11 @@ class Simulation:
             if isinstance(node_object, howlitbe.topology.Switch) \
                         and node_object.is_gate:
                 data_amount = self.agent_index[inode].generate_inbound_data(
-                        self,
-                        self.topology,
-                        node_object,
-                        dt,
-                        user_arg)
+                        simulation=self,
+                        topology=self.topology,
+                        self_as_node_object=node_object,
+                        dt=dt,
+                        user_arg=user_arg)
                 self.pending_data.append(_PendingData(
                         deciding_inode=inode,
                         backtrace_nodes_as_agents=list(),
@@ -174,22 +173,27 @@ class Simulation:
         new_pending_data = list()
         for pd in self.pending_data:
             agent_object: NodeAgent = self.agent_index[pd.deciding_inode]
-            if isinstance(pd.deciding_inode, howlitbe.topology.Switch):
+            if isinstance(self.topology.as_nxgraph().nodes[pd.deciding_inode]["data"],
+                        howlitbe.topology.Switch):
                 # Get neighboring nodes excluding those from backtrace
                 neighbor_nodes: list[int] = [i for i in \
-                        self.topology.as_nxgraph().neighbors(hash(pd.deciding_inode))
-                        if hash(i) not in map(hash,
+                        self.topology.as_nxgraph().neighbors(pd.deciding_inode)
+                        if i not in map(hash,
                         pd.backtrace_node_ids)]
+
+                # Topological dead-ends are not handled here
+                assert len(neighbor_nodes)
 
                 neighbor_agents: list[NodeAgent] = \
                         [self.agent_index[i] for i in neighbor_nodes]
                 inext = agent_object.get_next_hop(
-                        self,
-                        self.topology,
-                        neighbor_agents,
-                        neighbor_nodes,
-                        agent_object,
-                        user_arg)
+                        simulation=self,
+                        topology=self.topology,
+                        neighbors_as_agents=neighbor_agents,
+                        neighbor_node_ids=neighbor_nodes,
+                        self_as_node_object=agent_object,
+                        dt=dt,
+                        user_arg=user_arg)
                 # Update the stats
                 self.stats.update_transferred(pd.deciding_inode,
                         neighbor_nodes[inext],
@@ -200,22 +204,22 @@ class Simulation:
                 pd.backtrace_node_ids.append(pd.deciding_inode)
                 pd.deciding_inode = neighbor_nodes[hash(inext)]
                 new_pending_data.append(pd)
-            elif isinstance(pd.deciding_inode, howlitbe.topology.Node):
+            elif isinstance(self.topology.as_nxgraph().nodes[pd.deciding_inode]["data"], howlitbe.topology.Node):
                 neighbor_agents = [self.agent_index[i] for i in \
                         self.topology.as_nxgraph().neighbors(pd.deciding_inode)]
                 neighbor_nodes = [i for i in \
                         self.topology.as_nxgraph().neighbors(hash(pd.deciding_inode))]
-                processed_amnt = agent_object.calc_processed_data_amt_bytes(
-                        self,
-                        self.topology,
-                        neighbor_agents,
-                        neighbor_nodes,
-                        agent_object,
-                        dt,
-                        pd.data_amount_bytes,
-                        user_arg)
+                processed_amnt = agent_object.calc_processed_data_amnt_bytes(
+                        simulation=self,
+                        topology=self.topology,
+                        neighbors_as_agents=neighbor_agents,
+                        neighbor_node_ids=neighbor_nodes,
+                        self_as_node_object=agent_object,
+                        dt=dt,
+                        data_amnt=pd.data_amount_bytes,
+                        user_arg=user_arg)
                 # Update the stats
-                self.stats.update_processed()
+                self.stats.update_processed(pd.deciding_inode, processed_amnt)
             else:
                 raise TypeError(f"Unsupported type {pd.__class__}")
         self.pending_data = new_pending_data
@@ -292,18 +296,26 @@ class SimTraceApp:
         self.simulation.step(float(self.input.get()), self.user_arg)
         self.update_plot()
         self.update_ui()
-        # TODO: add showing the stats for the edges, and nodes
 
     def _get_edge_label(self, nodea, nodeb):
         return f"Passed {self.simulation.stats.get_non_directed_edge_stats(nodea, nodeb)}B"
 
     def _get_node_label(self, nodeid):
-        return f"Node {nodeid}\nProcessed {self.simulation.stats.get_processed(nodeid)}B"
+        if isinstance(self.topology.as_nxgraph().nodes[nodeid]["data"],
+                howlitbe.topology.Switch):
+            if self.topology.as_nxgraph().nodes[nodeid]["data"].is_gate:
+                return f"Gate {nodeid}"
+            else:
+                return f"Switch {nodeid}"
+        else:
+            return f"Node {nodeid}\nProcessed {self.simulation.stats.get_processed(nodeid)}B"
 
     def update_plot(self):
+        self.ax.clear()
         self.topology.render(ax=self.ax, show=False,
                 get_node_label_cb=self._get_node_label,
                 get_edge_label_cb=self._get_edge_label)
+        self.canvas.draw()
 
     def update_ui(self):
         self.current_t.configure(text=f"Current time: {self.simulation.get_previous_time()}")
@@ -340,11 +352,10 @@ def test_inbound_passing_w_termination():
     topology = howlitbe.topology.Topology(nx.Graph())
     topology.add_edge(s1, s2, howlitbe.topology.PhysicalLink(s1, s2, bandwidth=1024))
     topology.add_edge(s1, s3, howlitbe.topology.PhysicalLink(s1, s3, bandwidth=1024))
-    topology.add_edge(s1, n1, howlitbe.topology.PhysicalLink(s1, n1, bandwidth=512))
-    topology.add_edge(s1, n2, howlitbe.topology.PhysicalLink(s1, n2, bandwidth=512))
+    topology.add_edge(s2, n1, howlitbe.topology.PhysicalLink(s1, n1, bandwidth=512))
+    topology.add_edge(s2, n2, howlitbe.topology.PhysicalLink(s1, n2, bandwidth=512))
     topology.add_edge(s3, n3, howlitbe.topology.PhysicalLink(s2, n3, bandwidth=512))
     topology.add_edge(s3, n4, howlitbe.topology.PhysicalLink(s2, n4, bandwidth=512))
-    topology.graph.edges[(hash(s1), hash(n1))]["label"] = "Hi"
     simulation = Simulation(topology,
             RandomPassNodeAgent,
             None)
