@@ -210,6 +210,12 @@ def test_enumeration():
     assert(len(id_list) == len(set(id_list)))
 
 
+class _TopologyRenderState:
+
+    def __init__(self):
+        self.pos = None
+
+
 class Topology(nx.Graph):
     """
     NXGraph is used as the underlying storage.
@@ -221,6 +227,7 @@ class Topology(nx.Graph):
 
     def __init__(self, graph: nx.Graph):
         self.graph: nx.Graph = graph
+        self.render_state = _TopologyRenderState()
 
     def as_nxgraph(self):
         """
@@ -262,7 +269,8 @@ class Topology(nx.Graph):
             return color
         nx_graph = self.as_nxgraph()
         colors = [__node_color(nx_graph.nodes[i]["data"]) for i in nx_graph.nodes()]
-        pos = nx.spring_layout(nx_graph)
+        if self.render_state.pos is None:
+            self.render_state.pos = nx.spring_layout(nx_graph)
 
         labels=None
         if get_node_label_cb is not None:
@@ -270,12 +278,12 @@ class Topology(nx.Graph):
             for inode in nx_graph.nodes:
                 labels[inode] = get_node_label_cb(inode)
 
-        nx.draw(nx_graph, pos, ax=ax, with_labels=True, labels=labels,
+        nx.draw(nx_graph, self.render_state.pos, ax=ax, with_labels=True, labels=labels,
                 node_color=colors)
 
         if get_edge_label_cb is not None:
             edge_labels = {e[:2]:get_edge_label_cb(e[0], e[1]) for e in nx_graph.edges}
-            nx.draw_networkx_edge_labels(nx_graph, pos,
+            nx.draw_networkx_edge_labels(nx_graph, self.render_state.pos,
                     edge_labels=edge_labels)
 
         if show:

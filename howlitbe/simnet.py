@@ -297,8 +297,26 @@ class SimTraceApp:
         self.update_plot()
         self.update_ui()
 
+    @staticmethod
+    def _format_bytes(size):
+        """Convert a byte size into a human-readable format."""
+        if size < 0:
+            raise ValueError("Size must be a non-negative integer.")
+
+        # Define the units
+        units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']
+
+        # Determine the appropriate unit
+        i = 0
+        while size >= 1024 and i < len(units) - 1:
+            size /= 1024.0
+            i += 1
+
+        # Format the output to 3 decimal places
+        return f"{size:.3f} {units[i]}"
+
     def _get_edge_label(self, nodea, nodeb):
-        return f"Passed {self.simulation.stats.get_non_directed_edge_stats(nodea, nodeb)}B"
+        return f"Passed {self._format_bytes(self.simulation.stats.get_non_directed_edge_stats(nodea, nodeb))}"
 
     def _get_node_label(self, nodeid):
         if isinstance(self.topology.as_nxgraph().nodes[nodeid]["data"],
@@ -308,7 +326,7 @@ class SimTraceApp:
             else:
                 return f"Switch {nodeid}"
         else:
-            return f"Node {nodeid}\nProcessed {self.simulation.stats.get_processed(nodeid)}B"
+            return f"Node {nodeid}\nProcessed {self._format_bytes(self.simulation.stats.get_processed(nodeid))}"
 
     def update_plot(self):
         self.ax.clear()
